@@ -1,0 +1,212 @@
+---
+title: "EDA Position 2022"
+author: "Tarun Agrawal"
+date: "1/7/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+  
+<h3 align="center"> Description of the Variables </h3>
+
+**Degree all** - This column represents the number of people a learner reached out on the discussion forum 
+
+**Strength all** - This column represent the many times a learner reached out on the discussion forum 
+
+**Treatment** - This column tells if the student was a part of the experiment or the control group. Here, _experiment_ means that the student received the treatment and _control_ means that the student did not receive the treatment.
+
+**useSRLUI** - This column tells us if the student actually interacted with the Self Regulatory Learner User Interface (SRLUI) or not. Here 1 means that the student interacted, and 0 means he did not interact with the treatment.
+
+**Grades** - This column tells us Grades obtained by the student
+
+**drop_out** - This columns informs us if the student dropped out of the course or not.
+
+**survival_days** - This columns informs us about the number of days student was a part of the course
+
+<h3 align="center"> Motivating Questions and Ideas for Analysis </h3>
+
+**1.** What was the impact of treatment on the learning outcomes, that is grades, drop outs, and survival days?
+
+**2.** Identifying the variables(including grades and survival days with others) that determines if a student will drop out of the course, and using the logistic regression to predict the same based on useful variables.
+
+**3** Identify the relation between the number of times a learned reached out on the discussion forum/ number of people learned out to, and the learning outcomes, and applying linear regression model to predict the grade, and survival days of student using the significant variables.
+
+<h3 align="center"> Importing and Cleaning the data </h3>
+
+This code block installs the required libraries, and load the data file into the environment, performs some basic checks and filters the data to get it in the final that could be used for analysis.
+```{r , message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(fastDummies)
+data<-read_csv("/Users/tarunagrawal/Downloads/SRLUIBeta1_fake_data - SRLUIBeta1_fake_data.csv")
+data1<-data[,c(5,12,19,20,21,22,23,24)]
+data2<-data[,c(5,12,19,20,21,22,23,24)]
+
+# Gathering basic insights about the data to make sure it is correct to the best of our knowledge
+summary(data2)
+# Checking the data type of each variable, and get it in the correct form if needed.
+str(data2) 
+
+# Changing the data types for required variables
+data2$useSRLUI<-as.factor(data2$useSRLUI)
+data2$drop_out<-as.factor(data2$drop_out)
+
+# Other Basic checks on the data
+# Check for the NA values in the data set
+which(is.na(data1)) # No NA values  found
+
+# Check for the possible basic errors of the values in the degree_all and strength_all columns.
+which(data1$degree_all>data1$strength_all) # Appears to be correct
+
+# Check if all students intended to use SRLUI did it or not
+data1 %>% filter(treatment=="experiment" & useSRLUI==0) 
+# Not all intended students used SRLUI
+
+```
+
+<br>
+
+<h4> Part 1:</h4> This part explores **the impact of treatment on the learning outcomes, that is grades, drop outs, and survival days.**
+
+__Note:__ _The analysis has been done based on if student interacted with the treatment or not, and not on the basis of the intent to treat. It is clear from previous analysis that two are not the same_
+
+<h4> Impact on grades </h4>
+```{r}
+# Create a box plot to identify the impact of treatment on grades
+
+ggplot(data2) + geom_boxplot(mapping = aes(x=Grade)) + facet_wrap("useSRLUI") + theme(axis.title.x =element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)), axis.title.y=element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+# Find the values of quantiles, and mean to get exact values for comparison
+data_NI<- data2 %>% filter(useSRLUI=="0")
+data_I<- data2 %>% filter(useSRLUI=="1")
+quantile(data_NI$Grade, probs = seq(0,1,0.25))
+quantile(data_I$Grade, probs = seq(0,1,0.25))
+
+# Mean for the students who did not interact with treatment
+mean(data_NI$Grade)
+
+# Mean for the students who interacted with treatment
+mean(data_I$Grade)
+```
+
+As is evident from the plot, and the values that the treatment did not have any significant impact on the grades of the students. The numbers for the quantiles, and the average value of grades for the two groups are close to each other.
+
+<h4> Impact on drop out </h4>
+```{r}
+# Create a bar plot for number of drop outs in both the categories
+ggplot(data2) + geom_bar(mapping = aes(x=drop_out, fill=useSRLUI))
+
+# Ratio of students who dropped out for those who did not interacted with treatment
+nrow(data_NI %>% filter(drop_out==1))/nrow(data_NI)
+
+# Ratio of students who dropped out for those who interacted with treatment
+nrow(data_I %>% filter(drop_out==1))/nrow(data_I)
+
+```
+
+It can be concluded from the graphs, and the ratio that the treatment did not have an significant impact on the drop out rate.
+
+<h4> Impact on survival days </h4>
+```{r}
+# Create a box plot to identify the impact of treatment on survival days
+
+ggplot(data2) + geom_boxplot(mapping = aes(x=survival_days)) + facet_wrap("useSRLUI") + theme(axis.title.x =element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)), axis.title.y=element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+quantile(data_NI$survival_days, probs = seq(0,1,0.25))
+quantile(data_I$survival_days, probs = seq(0,1,0.25))
+
+# Mean for the students who did not interact with treatment
+mean(data_NI$survival_days)
+
+# Mean for the students who interacted with treatment
+mean(data_I$survival_days)
+```
+
+The box plot suggests the presence of outliers in both the categories. As is evident from the box plots, quantiles and mean, the treatment did not have a significant impact on survival days as well.
+
+<h4> Part 2:</h4> 
+
+This part **Identify the variables(including grades and survival days with others) that determines if a student will drop out of the course, and using the logistic regression to predict the same based on useful variables.**
+
+__Note:__ 
+
+_1. All the students are taken into account irrespective of the treatment group. This is because the treatment did not had any significant impact on the outcomes as visible in previous parts._ 
+
+_2. Also the linearity assumptions such as normality are assumed to be true/checked using the residual plots plotted later._
+
+_3. The outliers in the survival_days have not been removed._
+```{r}
+# Check the multi-collinearity
+data_correlation<-as.matrix(data1 %>% select(c(degree_all,strength_all,Grade,survival_days)))
+cor(data_correlation)
+
+# This suggests the presence of high correlation between degree_all and strength_all. Hence only one of the two can be used for logistic regression model.
+
+# Logistic Regression for the chances of drop out
+
+set.seed(3)
+split = sample(1:nrow(data1), nrow(data1)*0.80)
+train = data1[split,]
+test = data1[-split,]
+
+# Using only strength_all
+logit1<-glm(train$drop_out~., data = train[,c(2,5,8)], family = "binomial")
+summary(logit1)
+
+# Using only degree_all
+logit2<-glm(train$drop_out~., data = train[,c(1,5,8)], family = "binomial")
+summary(logit2)
+
+# AIC for Case 2 is lower, hence we would use degree_all.
+
+predicted<-predict(logit2, test, type="response")
+for (i in 1:length(predicted)) {
+  if(predicted[i]>=0.05){
+    predicted[i]=1
+  } else
+  {predicted[i]=0
+    }
+}
+
+length(which(predicted==test$drop_out))
+```
+
+The given logistic model predicted the correct outcome in 61 out of 65 test cases. Based on this, we can assume that degree_all, grade, and survival_days can be used as predictors for the drop out rates. The prediction would improve as the sample size would be increased.
+
+<h4> Part 3:</h4> 
+This part **identifies the relation between the number of times a learned reached out on the discussion forum/ number of people learned out to, and the grades and survival days, and applying linear regression to develop a model to predict the grade, and survival days of student using the significant variables.**
+
+<h4> Grades</h4>
+```{r}
+
+# Linear Model for the prediction of Grades
+reg<-lm(Grade~., data = data1[,c(1,5,8)]) # Only using 1 and 5 significantly reduced the adjusted R-squared Value
+summary(reg)
+
+predict(reg,test)
+plot(rstandard(reg),ylab = "Standard Residulas")
+```
+
+The linear model suggests that the degree_all and survival_days is a useful predictor for Grades in case of using linear models.But the Adjusted R-squared value is low, which implies that the linear model may not be the best to use in this case. This can be verified from the plot of standard residuals which shows large error in predicted values.
+
+<h4> Survival Days</h4>
+```{r}
+
+# Linear Model for the Survival Days
+reg1<-lm(survival_days~., data = data1[,c(1,5,8)])
+summary(reg1)
+
+predict(reg1,test)
+plot(rstandard(reg1),ylab = "Standard Residulas")
+
+```
+
+The linear model suggests that the degree_all and grade is a useful predictor for survival days in case of using linear models. Since the Adjusted R-squared value is low, linear model may not be the best to use in this case. This can be verified from the plot of studentised residuals which shows large error in predicted values.
+
+<h3 align="center"> Conclusion </h3>
+
+1. The treatment didn't result in a significant change in either of the learning outcome.
+2. degree_all, grade, and survival_days turned out to be good predictors for the chance of a student dropping out.
+3. The linear model suggested using degree_all, and survival days for the prediction of Grades but was not that effective due to low adjusted R squared. It also suggested the same for predicting survival days using degree_all and Grades as predictor variables.
